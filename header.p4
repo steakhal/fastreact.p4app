@@ -27,45 +27,72 @@ header ipv4_t {
 }
 
 
-// ((S1 < 50)v(S2 > 25))^(S3 = 10)
+
+
+#define NUMBER_OF_RULES 1
+#define NUMBER_OF_CONJS_OF_A_RULE 3
+#define NUMBER_OF_DISJS_OF_A_RULE 3
+
+#define SENSOR_VALUE_BITWIDTH 8
+#define SENSOR_ID_BITWIDTH 8
+
+#define OP_BITWIDTH 3
+#define OP_INVALID 0
+#define OP_LT 1
+#define OP_LE 2
+#define OP_GT 3
+#define OP_GE 4
+#define OP_EQ 5
+#define OP_NE 6
+
+#define TRIPLET_BIT_WIDTH ((SENSOR_ID_BITWIDTH) + (OP_BITWIDTH) + (SENSOR_VALUE_BITWIDTH))
+#define RULE_BITWIDTH ((NUMBER_OF_CONJS_OF_A_RULE) * (NUMBER_OF_DISJS_OF_A_RULE) * (TRIPLET_BIT_WIDTH))
+
+typedef bit<SENSOR_ID_BITWIDTH> sensor_id_t;
+typedef bit<OP_BITWIDTH> op_t;
+typedef bit<SENSOR_VALUE_BITWIDTH> sensor_value_t;
+typedef bit<RULE_BITWIDTH> bitrule_t;
+
+// DNF form
+// ((S1 < 50)^(S2 > 25))v(S3 = 10)
 struct rule_t {
-  int<8> sensor_id000;
-  int<8> opcode000;
-  int<8> constant_value000;
+  sensor_id_t    sensor_id000;
+  op_t           opcode000;
+  sensor_value_t constant_value000;
   
-  int<8> sensor_id001;
-  int<8> opcode001;
-  int<8> constant_value001;
+  sensor_id_t    sensor_id001;
+  op_t           opcode001;
+  sensor_value_t constant_value001;
   
-  int<8> sensor_id002;
-  int<8> opcode002;
-  int<8> constant_value002;
-  
-  
-  int<8> sensor_id010;
-  int<8> opcode010;
-  int<8> constant_value010;
-  
-  int<8> sensor_id011;
-  int<8> opcode011;
-  int<8> constant_value011;
-  
-  int<8> sensor_id012;
-  int<8> opcode012;
-  int<8> constant_value012;
+  sensor_id_t    sensor_id002;
+  op_t           opcode002;
+  sensor_value_t constant_value002;
   
   
-  int<8> sensor_id020;
-  int<8> opcode020;
-  int<8> constant_value020;
+  sensor_id_t    sensor_id010;
+  op_t           opcode010;
+  sensor_value_t constant_value010;
   
-  int<8> sensor_id021;
-  int<8> opcode021;
-  int<8> constant_value021;
+  sensor_id_t    sensor_id011;
+  op_t           opcode011;
+  sensor_value_t constant_value011;
   
-  int<8> sensor_id022;
-  int<8> opcode022;
-  int<8> constant_value022;
+  sensor_id_t    sensor_id012;
+  op_t           opcode012;
+  sensor_value_t constant_value012;
+  
+  
+  sensor_id_t    sensor_id020;
+  op_t           opcode020;
+  sensor_value_t constant_value020;
+  
+  sensor_id_t    sensor_id021;
+  op_t           opcode021;
+  sensor_value_t constant_value021;
+  
+  sensor_id_t    sensor_id022;
+  op_t           opcode022;
+  sensor_value_t constant_value022;
 }
 
 struct metadata {
@@ -74,8 +101,8 @@ struct metadata {
 }
 
 header sensor_data {
-    int<8> sensor_id;
-    int<8> sensor_value;
+    sensor_id_t sensor_id;
+    sensor_value_t sensor_value;
 }
 
 struct headers {
