@@ -144,7 +144,7 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
     packet.extract(hdr.ethernet);
     transition select(hdr.ethernet.etherType) {
       ethernet_kind.ipv4:   parse_ipv4;
-      ethernet_kind.sensor: parse_ipv4_and_sensor_data;
+      ethernet_kind.sensor: parse_sensor_data;
       default: accept;
     }
   }
@@ -153,10 +153,9 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
     packet.extract(hdr.ipv4);
     transition accept;
   }
-  state parse_ipv4_and_sensor_data {
-    packet.extract(hdr.ipv4);
+  state parse_sensor_data {
     packet.extract(hdr.sensordata);
-    transition accept;
+    transition parse_ipv4;
   }
 
   state start {
