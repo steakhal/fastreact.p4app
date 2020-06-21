@@ -39,15 +39,20 @@ header sensor_data {
   sensor_value_t sensor_value;
 }
 
-header did_trigger {
-  bit<32> yesorno;
-}
-
 struct headers {
   ethernet_t ethernet;
   ipv4_t ipv4;
   sensor_data sensordata;
-  did_trigger wittness; // TODO: proof of concept that it can evaluate a given rule
+}
+
+enum bit<2> rule_match_kind {
+  no_rule_found      = 0,
+  evaluated_to_true  = 1,
+  evaluated_to_false = 2
+}
+
+struct metadata {
+  rule_match_kind match;
 }
 
 
@@ -128,8 +133,6 @@ struct rule_t {
   sensor_value_t constant23;
 }
 
-struct metadata {}
-
 parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   state parse_ethernet {
     packet.extract(hdr.ethernet);
@@ -183,6 +186,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   action drop() {
     mark_to_drop(standard_metadata);
+  }
+
+  action default_handler() {
+    meta.match = rule_match_kind.no_rule_found;
   }
 
   action apply_rule(
@@ -261,24 +268,25 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
          !eval_triplet(value21, op21, constant21) ||
          !eval_triplet(value22, op22, constant22) ||
          !eval_triplet(value23, op23, constant23))) {
-      hdr.wittness.yesorno = 0;
+      // TODO: hook rule did not match event?
+      meta.match = rule_match_kind.evaluated_to_false;
       return;
     }
 
-    // rule triggered
-    hdr.wittness.yesorno = 1;
+    // TODO: hook rule did match event?
+    meta.match = rule_match_kind.evaluated_to_true;
   }
 
   table sensor_to_rule_mapping {
     actions = {
+      default_handler;
       apply_rule;
-      NoAction;
     }
     key = {
       hdr.sensordata.sensor_id: exact;
     }
     size = maximum_number_of_rules;
-    default_action = NoAction();
+    default_action = default_handler();
   }
 
 
@@ -339,7 +347,6 @@ control MyDeparser(packet_out packet, in headers hdr) {
   apply {
     packet.emit(hdr.ethernet);
     packet.emit(hdr.ipv4);
-    packet.emit(hdr.wittness);
   }
 }
 
