@@ -211,54 +211,36 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     sensor_id_t id22, op_t op22, sensor_value_t constant22,
     sensor_id_t id23, op_t op23, sensor_value_t constant23) {
 
-    sensor_id_t sensor_id = hdr.sensordata.sensor_id;
-    sensor_value_t sensor_value = hdr.sensordata.sensor_value;
+    // save current sensor value
+    sensor_history.write((bit<32>)hdr.sensordata.sensor_id, hdr.sensordata.sensor_value);
 
-    sensor_value_t cached00;
-    sensor_value_t cached01;
-    sensor_value_t cached02;
-    sensor_value_t cached03;
+    sensor_value_t value00;
+    sensor_value_t value01;
+    sensor_value_t value02;
+    sensor_value_t value03;
+    sensor_value_t value10;
+    sensor_value_t value11;
+    sensor_value_t value12;
+    sensor_value_t value13;
+    sensor_value_t value20;
+    sensor_value_t value21;
+    sensor_value_t value22;
+    sensor_value_t value23;
 
-    sensor_value_t cached10;
-    sensor_value_t cached11;
-    sensor_value_t cached12;
-    sensor_value_t cached13;
-
-    sensor_value_t cached20;
-    sensor_value_t cached21;
-    sensor_value_t cached22;
-    sensor_value_t cached23;
-
-    // unfortunately we can not read registers after a branch happen, so we can not omit unnecessary register reads
-    sensor_history.read(cached00, (bit<32>)id00);
-    sensor_history.read(cached01, (bit<32>)id01);
-    sensor_history.read(cached02, (bit<32>)id02);
-    sensor_history.read(cached03, (bit<32>)id03);
-
-    sensor_history.read(cached10, (bit<32>)id10);
-    sensor_history.read(cached11, (bit<32>)id11);
-    sensor_history.read(cached12, (bit<32>)id12);
-    sensor_history.read(cached13, (bit<32>)id13);
-
-    sensor_history.read(cached20, (bit<32>)id20);
-    sensor_history.read(cached21, (bit<32>)id21);
-    sensor_history.read(cached22, (bit<32>)id22);
-    sensor_history.read(cached23, (bit<32>)id23);
-
-    sensor_value_t value00 = id00 == sensor_id? sensor_value : cached00;
-    sensor_value_t value01 = id01 == sensor_id? sensor_value : cached01;
-    sensor_value_t value02 = id02 == sensor_id? sensor_value : cached02;
-    sensor_value_t value03 = id03 == sensor_id? sensor_value : cached03;
-
-    sensor_value_t value10 = id10 == sensor_id? sensor_value : cached10;
-    sensor_value_t value11 = id11 == sensor_id? sensor_value : cached11;
-    sensor_value_t value12 = id12 == sensor_id? sensor_value : cached12;
-    sensor_value_t value13 = id13 == sensor_id? sensor_value : cached13;
-
-    sensor_value_t value20 = id20 == sensor_id? sensor_value : cached20;
-    sensor_value_t value21 = id21 == sensor_id? sensor_value : cached21;
-    sensor_value_t value22 = id22 == sensor_id? sensor_value : cached22;
-    sensor_value_t value23 = id23 == sensor_id? sensor_value : cached23;
+    // unfortunately we can not read registers after a branch happen,
+    // so we can not omit unnecessary register reads
+    sensor_history.read(value00, (bit<32>)id00);
+    sensor_history.read(value01, (bit<32>)id01);
+    sensor_history.read(value02, (bit<32>)id02);
+    sensor_history.read(value03, (bit<32>)id03);
+    sensor_history.read(value10, (bit<32>)id10);
+    sensor_history.read(value11, (bit<32>)id11);
+    sensor_history.read(value12, (bit<32>)id12);
+    sensor_history.read(value13, (bit<32>)id13);
+    sensor_history.read(value20, (bit<32>)id20);
+    sensor_history.read(value21, (bit<32>)id21);
+    sensor_history.read(value22, (bit<32>)id22);
+    sensor_history.read(value23, (bit<32>)id23);
 
     // if the rule does not apply, return
     if ((!eval_triplet(value00, op00, constant00) ||
