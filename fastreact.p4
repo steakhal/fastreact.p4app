@@ -11,10 +11,15 @@ typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
+enum bit<16> ethernet_kind {
+  ipv4   = 0x800,
+  sensor = 0x842
+}
+
 header ethernet_t {
   macAddr_t dstAddr;
   macAddr_t srcAddr;
-  bit<16> etherType;
+  ethernet_kind etherType;
 }
 
 header ipv4_t {
@@ -33,71 +38,83 @@ header ipv4_t {
 }
 
 
-// TODO: maybe use 'const bit<32>' type instead of macros?
-#define NUMBER_OF_RULES 1
-#define NUMBER_OF_CONJS_OF_A_RULE 3
-#define NUMBER_OF_DISJS_OF_A_RULE 3
+enum bit<3> op_t {
+  invalid = 0,
+  lt      = 1,
+  le      = 2,
+  gt      = 3,
+  ge      = 4,
+  eq      = 5,
+  ne      = 6
+}
 
-#define SENSOR_VALUE_BITWIDTH 8
-#define SENSOR_ID_BITWIDTH 8
+const bit<8> number_of_rules_for_sensor_id = 1;
+const bit<8> number_of_ors = 3;
+const bit<8> number_of_ands = 4;
 
-#define OP_BITWIDTH 3
-#define OP_INVALID 0
-#define OP_LT 1
-#define OP_LE 2
-#define OP_GT 3
-#define OP_GE 4
-#define OP_EQ 5
-#define OP_NE 6
+typedef bit<8> sensor_id_t;
+typedef bit<8> sensor_value_t;
 
-#define TRIPLET_BIT_WIDTH ((SENSOR_ID_BITWIDTH) + (OP_BITWIDTH) + (SENSOR_VALUE_BITWIDTH))
-#define RULE_BITWIDTH ((NUMBER_OF_CONJS_OF_A_RULE) * (NUMBER_OF_DISJS_OF_A_RULE) * (TRIPLET_BIT_WIDTH))
+// DNF form:
+// ((id00 op00 constant00)^(id01 op01 constant01)^(id02 op02 constant02)^(id03 op03 constant03))v
+// ((id10 op10 constant10)^(id11 op11 constant11)^(id12 op12 constant12)^(id13 op13 constant13))v
+// ((id20 op20 constant20)^(id21 op21 constant21)^(id22 op22 constant22)^(id23 op23 constant23))
 
-typedef bit<SENSOR_ID_BITWIDTH> sensor_id_t;
-typedef bit<OP_BITWIDTH> op_t;
-typedef bit<SENSOR_VALUE_BITWIDTH> sensor_value_t;
-typedef bit<RULE_BITWIDTH> bitrule_t;
-
-// DNF form
-// ((S1 < 50)^(S2 > 25))v(S3 = 10)
+// A rule is a DNF expression.
+// That contains a sequence of disjuncts (at most number_of_ors one of them).
+// Each disjunct is a conjunction of number_of_ands triplets.
+// Where a triplet is the sensor id, operator and the value comparing against.
+// If the corresponding operator has the value 'op_t.invalid' then that triplet and the rest of the triplets in the conjunction are invalid.
+// If the first triplet of a disjunct is invalid, then that disjunct and the rest of the disjuncts are invalid.
+// You can assume that each rule must have at least one valid triplet.
 struct rule_t {
-  sensor_id_t    sensor_id000;
-  op_t           opcode000;
-  sensor_value_t constant_value000;
+  sensor_id_t    id00;
+  op_t           op00;
+  sensor_value_t constant00;
 
-  sensor_id_t    sensor_id001;
-  op_t           opcode001;
-  sensor_value_t constant_value001;
+  sensor_id_t    id01;
+  op_t           op01;
+  sensor_value_t constant01;
 
-  sensor_id_t    sensor_id002;
-  op_t           opcode002;
-  sensor_value_t constant_value002;
+  sensor_id_t    id02;
+  op_t           op02;
+  sensor_value_t constant02;
 
+  sensor_id_t    id03;
+  op_t           op03;
+  sensor_value_t constant03;
 
-  sensor_id_t    sensor_id010;
-  op_t           opcode010;
-  sensor_value_t constant_value010;
+  sensor_id_t    id10;
+  op_t           op10;
+  sensor_value_t constant10;
 
-  sensor_id_t    sensor_id011;
-  op_t           opcode011;
-  sensor_value_t constant_value011;
+  sensor_id_t    id11;
+  op_t           op11;
+  sensor_value_t constant11;
 
-  sensor_id_t    sensor_id012;
-  op_t           opcode012;
-  sensor_value_t constant_value012;
+  sensor_id_t    id12;
+  op_t           op12;
+  sensor_value_t constant12;
 
+  sensor_id_t    id13;
+  op_t           op13;
+  sensor_value_t constant13;
 
-  sensor_id_t    sensor_id020;
-  op_t           opcode020;
-  sensor_value_t constant_value020;
+  sensor_id_t    id20;
+  op_t           op20;
+  sensor_value_t constant20;
 
-  sensor_id_t    sensor_id021;
-  op_t           opcode021;
-  sensor_value_t constant_value021;
+  sensor_id_t    id21;
+  op_t           op21;
+  sensor_value_t constant21;
 
-  sensor_id_t    sensor_id022;
-  op_t           opcode022;
-  sensor_value_t constant_value022;
+  sensor_id_t    id22;
+  op_t           op22;
+  sensor_value_t constant22;
+
+  sensor_id_t    id23;
+  op_t           op23;
+  sensor_value_t constant23;
 }
 
 struct metadata {}
@@ -129,8 +146,8 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
   state parse_ethernet {
     packet.extract(hdr.ethernet);
     transition select(hdr.ethernet.etherType) {
-      0x800: parse_ipv4;
-      0x801: parse_ipv4_and_sensor_data;
+      ethernet_kind.ipv4:   parse_ipv4;
+      ethernet_kind.sensor: parse_ipv4_and_sensor_data;
       default: accept;
     }
   }
@@ -186,19 +203,19 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 
 
 bool eval_triplet(in sensor_value_t val, in op_t op, in sensor_value_t constant) {
-  if (op == OP_INVALID)
+  if (op == op_t.invalid)
     return false;
-  if (op == OP_LT)
+  if (op == op_t.lt)
     return val < constant;
-  if (op == OP_LE)
+  if (op == op_t.le)
     return val <= constant;
-  if (op == OP_GT)
+  if (op == op_t.gt)
     return val > constant;
-  if (op == OP_GE)
+  if (op == op_t.ge)
     return val >= constant;
-  if (op == OP_EQ)
+  if (op == op_t.eq)
     return val == constant;
-  // if (op == OP_NE) // IT MUST BE THE NOT EQUAL BRANCH
+  // if (op == op_t.ne) // IT MUST BE THE NOT EQUAL BRANCH
   return val != constant;
 }
 
@@ -216,27 +233,28 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       sensor_id_t id00, op_t op00, sensor_value_t constant00,
       sensor_id_t id01, op_t op01, sensor_value_t constant01,
       sensor_id_t id02, op_t op02, sensor_value_t constant02,
+      sensor_id_t id03, op_t op03, sensor_value_t constant03,
       sensor_id_t id10, op_t op10, sensor_value_t constant10,
       sensor_id_t id11, op_t op11, sensor_value_t constant11,
       sensor_id_t id12, op_t op12, sensor_value_t constant12,
+      sensor_id_t id13, op_t op13, sensor_value_t constant13,
       sensor_id_t id20, op_t op20, sensor_value_t constant20,
       sensor_id_t id21, op_t op21, sensor_value_t constant21,
-      sensor_id_t id22, op_t op22, sensor_value_t constant22) {
+      sensor_id_t id22, op_t op22, sensor_value_t constant22,
+      sensor_id_t id23, op_t op23, sensor_value_t constant23) {
 
       sensor_id_t sensor_id = hdr.sensordata.sensor_id;
       sensor_value_t sensor_value = hdr.sensordata.sensor_value;
 
-      // DNF form
-      // ((S1 < 50)^(S2 > 25))v(S3 = 10)
 
-      // evaluate all the variable references of the first disjunctive group
-      // there will be NUMBER_OF_CONJS_OF_A_RULE one of them
       sensor_value_t val00 = id00 == sensor_id? sensor_value : lookup_cached_value(id00);
       sensor_value_t val01 = id01 == sensor_id? sensor_value : lookup_cached_value(id01);
       sensor_value_t val02 = id02 == sensor_id? sensor_value : lookup_cached_value(id02);
+      sensor_value_t val03 = id03 == sensor_id? sensor_value : lookup_cached_value(id03);
       if (eval_triplet(val00, op00, constant00) &&
           eval_triplet(val01, op01, constant01) &&
-          eval_triplet(val02, op02, constant02)) {
+          eval_triplet(val02, op02, constant02) &&
+          eval_triplet(val03, op03, constant03)) {
         // rule triggered
         hdr.wittness.yesorno = 1;
         return;
@@ -247,9 +265,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       sensor_value_t val10 = id10 == sensor_id? sensor_value : lookup_cached_value(id10);
       sensor_value_t val11 = id11 == sensor_id? sensor_value : lookup_cached_value(id11);
       sensor_value_t val12 = id12 == sensor_id? sensor_value : lookup_cached_value(id12);
+      sensor_value_t val13 = id13 == sensor_id? sensor_value : lookup_cached_value(id13);
       if (eval_triplet(val10, op10, constant10) &&
           eval_triplet(val11, op11, constant11) &&
-          eval_triplet(val12, op12, constant12)) {
+          eval_triplet(val12, op12, constant12) &&
+          eval_triplet(val13, op13, constant13)) {
         // rule triggered
         hdr.wittness.yesorno = 1;
         return;
@@ -258,9 +278,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       sensor_value_t val20 = id20 == sensor_id? sensor_value : lookup_cached_value(id20);
       sensor_value_t val21 = id21 == sensor_id? sensor_value : lookup_cached_value(id21);
       sensor_value_t val22 = id22 == sensor_id? sensor_value : lookup_cached_value(id22);
+      sensor_value_t val23 = id23 == sensor_id? sensor_value : lookup_cached_value(id23);
       if (eval_triplet(val20, op20, constant20) &&
           eval_triplet(val21, op21, constant21) &&
-          eval_triplet(val22, op22, constant22)) {
+          eval_triplet(val22, op22, constant22) &&
+          eval_triplet(val23, op23, constant23)) {
         // rule triggered
         hdr.wittness.yesorno = 1;
         return;
