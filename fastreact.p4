@@ -5,9 +5,8 @@
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
-
-typedef bit<8> sensor_id_t;
-typedef bit<8> sensor_value_t;
+typedef bit<8>  sensor_id_t;
+typedef bit<8>  sensor_value_t;
 
 enum bit<16> ethernet_kind {
   ipv4   = 0x800,
@@ -62,9 +61,10 @@ enum bit<3> op_t {
   ne      = 6
 }
 
-const bit<8> maximum_number_of_rules = 10;
-const bit<8> number_of_ors = 3;
-const bit<8> number_of_ands = 4;
+const bit<32> maximum_number_of_sensors = 7;
+const bit<32> maximum_number_of_rules = 10;
+const bit<32> number_of_ors = 3;
+const bit<32> number_of_ands = 4;
 
 // DNF form:
 // ((id00 op00 constant00)^(id01 op01 constant01)^(id02 op02 constant02)^(id03 op03 constant03))v
@@ -177,12 +177,10 @@ bool eval_triplet(in sensor_value_t val, in op_t op, in sensor_value_t constant)
   return val != constant;
 }
 
-sensor_value_t lookup_cached_value(in sensor_id_t id) {
-  // TODO: implement this
-  return 42;
-}
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
+  register<sensor_value_t>(maximum_number_of_sensors) sensor_history;
+
   action drop() {
     mark_to_drop(standard_metadata);
   }
@@ -204,50 +202,71 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     sensor_id_t sensor_id = hdr.sensordata.sensor_id;
     sensor_value_t sensor_value = hdr.sensordata.sensor_value;
 
+    sensor_value_t cached00;
+    sensor_value_t cached01;
+    sensor_value_t cached02;
+    sensor_value_t cached03;
 
-    sensor_value_t val00 = id00 == sensor_id? sensor_value : lookup_cached_value(id00);
-    sensor_value_t val01 = id01 == sensor_id? sensor_value : lookup_cached_value(id01);
-    sensor_value_t val02 = id02 == sensor_id? sensor_value : lookup_cached_value(id02);
-    sensor_value_t val03 = id03 == sensor_id? sensor_value : lookup_cached_value(id03);
-    if (eval_triplet(val00, op00, constant00) &&
-        eval_triplet(val01, op01, constant01) &&
-        eval_triplet(val02, op02, constant02) &&
-        eval_triplet(val03, op03, constant03)) {
-      // rule triggered
-      hdr.wittness.yesorno = 1;
+    sensor_value_t cached10;
+    sensor_value_t cached11;
+    sensor_value_t cached12;
+    sensor_value_t cached13;
+
+    sensor_value_t cached20;
+    sensor_value_t cached21;
+    sensor_value_t cached22;
+    sensor_value_t cached23;
+
+    // unfortunately we can not read registers after a branch happen, so we can not omit unnecessary register reads
+    sensor_history.read(cached00, (bit<32>)id00);
+    sensor_history.read(cached01, (bit<32>)id01);
+    sensor_history.read(cached02, (bit<32>)id02);
+    sensor_history.read(cached03, (bit<32>)id03);
+
+    sensor_history.read(cached10, (bit<32>)id10);
+    sensor_history.read(cached11, (bit<32>)id11);
+    sensor_history.read(cached12, (bit<32>)id12);
+    sensor_history.read(cached13, (bit<32>)id13);
+
+    sensor_history.read(cached20, (bit<32>)id20);
+    sensor_history.read(cached21, (bit<32>)id21);
+    sensor_history.read(cached22, (bit<32>)id22);
+    sensor_history.read(cached23, (bit<32>)id23);
+
+    sensor_value_t value00 = id00 == sensor_id? sensor_value : cached00;
+    sensor_value_t value01 = id01 == sensor_id? sensor_value : cached01;
+    sensor_value_t value02 = id02 == sensor_id? sensor_value : cached02;
+    sensor_value_t value03 = id03 == sensor_id? sensor_value : cached03;
+
+    sensor_value_t value10 = id10 == sensor_id? sensor_value : cached10;
+    sensor_value_t value11 = id11 == sensor_id? sensor_value : cached11;
+    sensor_value_t value12 = id12 == sensor_id? sensor_value : cached12;
+    sensor_value_t value13 = id13 == sensor_id? sensor_value : cached13;
+
+    sensor_value_t value20 = id20 == sensor_id? sensor_value : cached20;
+    sensor_value_t value21 = id21 == sensor_id? sensor_value : cached21;
+    sensor_value_t value22 = id22 == sensor_id? sensor_value : cached22;
+    sensor_value_t value23 = id23 == sensor_id? sensor_value : cached23;
+
+    // if the rule does not apply, return
+    if ((!eval_triplet(value00, op00, constant00) ||
+         !eval_triplet(value01, op01, constant01) ||
+         !eval_triplet(value02, op02, constant02) ||
+         !eval_triplet(value03, op03, constant03)) &&
+        (!eval_triplet(value10, op10, constant10) ||
+         !eval_triplet(value11, op11, constant11) ||
+         !eval_triplet(value12, op12, constant12) ||
+         !eval_triplet(value13, op13, constant13)) &&
+        (!eval_triplet(value20, op20, constant20) ||
+         !eval_triplet(value21, op21, constant21) ||
+         !eval_triplet(value22, op22, constant22) ||
+         !eval_triplet(value23, op23, constant23))) {
+      hdr.wittness.yesorno = 0;
       return;
     }
 
-
-    // same block repeates NUMBER_OF_DISJS_OF_A_RULE times for each disjunction
-    sensor_value_t val10 = id10 == sensor_id? sensor_value : lookup_cached_value(id10);
-    sensor_value_t val11 = id11 == sensor_id? sensor_value : lookup_cached_value(id11);
-    sensor_value_t val12 = id12 == sensor_id? sensor_value : lookup_cached_value(id12);
-    sensor_value_t val13 = id13 == sensor_id? sensor_value : lookup_cached_value(id13);
-    if (eval_triplet(val10, op10, constant10) &&
-        eval_triplet(val11, op11, constant11) &&
-        eval_triplet(val12, op12, constant12) &&
-        eval_triplet(val13, op13, constant13)) {
-      // rule triggered
-      hdr.wittness.yesorno = 1;
-      return;
-    }
-
-    sensor_value_t val20 = id20 == sensor_id? sensor_value : lookup_cached_value(id20);
-    sensor_value_t val21 = id21 == sensor_id? sensor_value : lookup_cached_value(id21);
-    sensor_value_t val22 = id22 == sensor_id? sensor_value : lookup_cached_value(id22);
-    sensor_value_t val23 = id23 == sensor_id? sensor_value : lookup_cached_value(id23);
-    if (eval_triplet(val20, op20, constant20) &&
-        eval_triplet(val21, op21, constant21) &&
-        eval_triplet(val22, op22, constant22) &&
-        eval_triplet(val23, op23, constant23)) {
-      // rule triggered
-      hdr.wittness.yesorno = 1;
-      return;
-    }
-
-    // rule did not trigger
-    hdr.wittness.yesorno = 0;
+    // rule triggered
+    hdr.wittness.yesorno = 1;
   }
 
   table sensor_to_rule_mapping {
