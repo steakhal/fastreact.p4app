@@ -183,111 +183,111 @@ sensor_value_t lookup_cached_value(in sensor_id_t id) {
 }
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    action drop() {
-      mark_to_drop(standard_metadata);
-    }
+  action drop() {
+    mark_to_drop(standard_metadata);
+  }
 
-    action apply_rule(
-      sensor_id_t id00, op_t op00, sensor_value_t constant00,
-      sensor_id_t id01, op_t op01, sensor_value_t constant01,
-      sensor_id_t id02, op_t op02, sensor_value_t constant02,
-      sensor_id_t id03, op_t op03, sensor_value_t constant03,
-      sensor_id_t id10, op_t op10, sensor_value_t constant10,
-      sensor_id_t id11, op_t op11, sensor_value_t constant11,
-      sensor_id_t id12, op_t op12, sensor_value_t constant12,
-      sensor_id_t id13, op_t op13, sensor_value_t constant13,
-      sensor_id_t id20, op_t op20, sensor_value_t constant20,
-      sensor_id_t id21, op_t op21, sensor_value_t constant21,
-      sensor_id_t id22, op_t op22, sensor_value_t constant22,
-      sensor_id_t id23, op_t op23, sensor_value_t constant23) {
+  action apply_rule(
+    sensor_id_t id00, op_t op00, sensor_value_t constant00,
+    sensor_id_t id01, op_t op01, sensor_value_t constant01,
+    sensor_id_t id02, op_t op02, sensor_value_t constant02,
+    sensor_id_t id03, op_t op03, sensor_value_t constant03,
+    sensor_id_t id10, op_t op10, sensor_value_t constant10,
+    sensor_id_t id11, op_t op11, sensor_value_t constant11,
+    sensor_id_t id12, op_t op12, sensor_value_t constant12,
+    sensor_id_t id13, op_t op13, sensor_value_t constant13,
+    sensor_id_t id20, op_t op20, sensor_value_t constant20,
+    sensor_id_t id21, op_t op21, sensor_value_t constant21,
+    sensor_id_t id22, op_t op22, sensor_value_t constant22,
+    sensor_id_t id23, op_t op23, sensor_value_t constant23) {
 
-      sensor_id_t sensor_id = hdr.sensordata.sensor_id;
-      sensor_value_t sensor_value = hdr.sensordata.sensor_value;
-
-
-      sensor_value_t val00 = id00 == sensor_id? sensor_value : lookup_cached_value(id00);
-      sensor_value_t val01 = id01 == sensor_id? sensor_value : lookup_cached_value(id01);
-      sensor_value_t val02 = id02 == sensor_id? sensor_value : lookup_cached_value(id02);
-      sensor_value_t val03 = id03 == sensor_id? sensor_value : lookup_cached_value(id03);
-      if (eval_triplet(val00, op00, constant00) &&
-          eval_triplet(val01, op01, constant01) &&
-          eval_triplet(val02, op02, constant02) &&
-          eval_triplet(val03, op03, constant03)) {
-        // rule triggered
-        hdr.wittness.yesorno = 1;
-        return;
-      }
+    sensor_id_t sensor_id = hdr.sensordata.sensor_id;
+    sensor_value_t sensor_value = hdr.sensordata.sensor_value;
 
 
-      // same block repeates NUMBER_OF_DISJS_OF_A_RULE times for each disjunction
-      sensor_value_t val10 = id10 == sensor_id? sensor_value : lookup_cached_value(id10);
-      sensor_value_t val11 = id11 == sensor_id? sensor_value : lookup_cached_value(id11);
-      sensor_value_t val12 = id12 == sensor_id? sensor_value : lookup_cached_value(id12);
-      sensor_value_t val13 = id13 == sensor_id? sensor_value : lookup_cached_value(id13);
-      if (eval_triplet(val10, op10, constant10) &&
-          eval_triplet(val11, op11, constant11) &&
-          eval_triplet(val12, op12, constant12) &&
-          eval_triplet(val13, op13, constant13)) {
-        // rule triggered
-        hdr.wittness.yesorno = 1;
-        return;
-      }
-
-      sensor_value_t val20 = id20 == sensor_id? sensor_value : lookup_cached_value(id20);
-      sensor_value_t val21 = id21 == sensor_id? sensor_value : lookup_cached_value(id21);
-      sensor_value_t val22 = id22 == sensor_id? sensor_value : lookup_cached_value(id22);
-      sensor_value_t val23 = id23 == sensor_id? sensor_value : lookup_cached_value(id23);
-      if (eval_triplet(val20, op20, constant20) &&
-          eval_triplet(val21, op21, constant21) &&
-          eval_triplet(val22, op22, constant22) &&
-          eval_triplet(val23, op23, constant23)) {
-        // rule triggered
-        hdr.wittness.yesorno = 1;
-        return;
-      }
-
-      // rule did not trigger
-      hdr.wittness.yesorno = 0;
-    }
-
-    table sensor_to_rule_mapping {
-      actions = {
-        apply_rule;
-        NoAction;
-      }
-      key = {
-        hdr.sensordata.sensor_id: exact;
-      }
-      size = maximum_number_of_rules;
-      default_action = NoAction();
+    sensor_value_t val00 = id00 == sensor_id? sensor_value : lookup_cached_value(id00);
+    sensor_value_t val01 = id01 == sensor_id? sensor_value : lookup_cached_value(id01);
+    sensor_value_t val02 = id02 == sensor_id? sensor_value : lookup_cached_value(id02);
+    sensor_value_t val03 = id03 == sensor_id? sensor_value : lookup_cached_value(id03);
+    if (eval_triplet(val00, op00, constant00) &&
+        eval_triplet(val01, op01, constant01) &&
+        eval_triplet(val02, op02, constant02) &&
+        eval_triplet(val03, op03, constant03)) {
+      // rule triggered
+      hdr.wittness.yesorno = 1;
+      return;
     }
 
 
-    action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
-      standard_metadata.egress_spec = port;
-      hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-      hdr.ethernet.dstAddr = dstAddr;
-      hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-    }
-    table ipv4_lpm {
-      key = {
-        hdr.ipv4.dstAddr: lpm;
-      }
-      actions = {
-        ipv4_forward;
-        drop;
-        NoAction;
-      }
-      size = 1024;
-      default_action = drop();
+    // same block repeates NUMBER_OF_DISJS_OF_A_RULE times for each disjunction
+    sensor_value_t val10 = id10 == sensor_id? sensor_value : lookup_cached_value(id10);
+    sensor_value_t val11 = id11 == sensor_id? sensor_value : lookup_cached_value(id11);
+    sensor_value_t val12 = id12 == sensor_id? sensor_value : lookup_cached_value(id12);
+    sensor_value_t val13 = id13 == sensor_id? sensor_value : lookup_cached_value(id13);
+    if (eval_triplet(val10, op10, constant10) &&
+        eval_triplet(val11, op11, constant11) &&
+        eval_triplet(val12, op12, constant12) &&
+        eval_triplet(val13, op13, constant13)) {
+      // rule triggered
+      hdr.wittness.yesorno = 1;
+      return;
     }
 
-    apply {
-      if (hdr.sensordata.isValid())
-        sensor_to_rule_mapping.apply();
-      if (hdr.ipv4.isValid())
-        ipv4_lpm.apply();
+    sensor_value_t val20 = id20 == sensor_id? sensor_value : lookup_cached_value(id20);
+    sensor_value_t val21 = id21 == sensor_id? sensor_value : lookup_cached_value(id21);
+    sensor_value_t val22 = id22 == sensor_id? sensor_value : lookup_cached_value(id22);
+    sensor_value_t val23 = id23 == sensor_id? sensor_value : lookup_cached_value(id23);
+    if (eval_triplet(val20, op20, constant20) &&
+        eval_triplet(val21, op21, constant21) &&
+        eval_triplet(val22, op22, constant22) &&
+        eval_triplet(val23, op23, constant23)) {
+      // rule triggered
+      hdr.wittness.yesorno = 1;
+      return;
     }
+
+    // rule did not trigger
+    hdr.wittness.yesorno = 0;
+  }
+
+  table sensor_to_rule_mapping {
+    actions = {
+      apply_rule;
+      NoAction;
+    }
+    key = {
+      hdr.sensordata.sensor_id: exact;
+    }
+    size = maximum_number_of_rules;
+    default_action = NoAction();
+  }
+
+
+  action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+    standard_metadata.egress_spec = port;
+    hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+    hdr.ethernet.dstAddr = dstAddr;
+    hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+  }
+  table ipv4_lpm {
+    key = {
+      hdr.ipv4.dstAddr: lpm;
+    }
+    actions = {
+      ipv4_forward;
+      drop;
+      NoAction;
+    }
+    size = 1024;
+    default_action = drop();
+  }
+
+  apply {
+    if (hdr.sensordata.isValid())
+      sensor_to_rule_mapping.apply();
+    if (hdr.ipv4.isValid())
+      ipv4_lpm.apply();
+  }
 }
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
