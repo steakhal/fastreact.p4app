@@ -1,15 +1,13 @@
 #include <core.p4>
 #include <v1model.p4>
 
-/*
-************************************************************************
-*********************** H E A D E R S **********************************
-************************************************************************
-*/
 
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+
+typedef bit<8> sensor_id_t;
+typedef bit<8> sensor_value_t;
 
 enum bit<16> ethernet_kind {
   ipv4   = 0x800,
@@ -37,6 +35,22 @@ header ipv4_t {
   ip4Addr_t dstAddr;
 }
 
+header sensor_data {
+  sensor_id_t sensor_id;
+  sensor_value_t sensor_value;
+}
+
+header did_trigger {
+  bit<32> yesorno;
+}
+
+struct headers {
+  ethernet_t ethernet;
+  ipv4_t ipv4;
+  sensor_data sensordata;
+  did_trigger wittness; // TODO: proof of concept that it can evaluate a given rule
+}
+
 
 enum bit<3> op_t {
   invalid = 0,
@@ -48,12 +62,9 @@ enum bit<3> op_t {
   ne      = 6
 }
 
-const bit<8> number_of_rules_for_sensor_id = 1;
+const bit<8> maximum_number_of_rules = 10;
 const bit<8> number_of_ors = 3;
 const bit<8> number_of_ands = 4;
-
-typedef bit<8> sensor_id_t;
-typedef bit<8> sensor_value_t;
 
 // DNF form:
 // ((id00 op00 constant00)^(id01 op01 constant01)^(id02 op02 constant02)^(id03 op03 constant03))v
@@ -119,29 +130,6 @@ struct rule_t {
 
 struct metadata {}
 
-header sensor_data {
-  sensor_id_t sensor_id;
-  sensor_value_t sensor_value;
-}
-
-header did_trigger {
-  bit<32> yesorno;
-}
-
-struct headers {
-  ethernet_t ethernet;
-  ipv4_t ipv4;
-  sensor_data sensordata;
-  did_trigger wittness; // TODO: proof of concept that it can evaluate a given rule
-}
-
-
-/*
-************************************************************************
-*********************** P A R S E R ************************************
-************************************************************************
-*/
-
 parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   state parse_ethernet {
     packet.extract(hdr.ethernet);
@@ -167,38 +155,8 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
   }
 }
 
-control MyDeparser(packet_out packet, in headers hdr) {
-  apply {
-    packet.emit(hdr.ethernet);
-    packet.emit(hdr.ipv4);
-    packet.emit(hdr.wittness);
-  }
-}
-
 control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
   apply { }
-}
-
-control MyComputeChecksum(inout headers hdr, inout metadata meta) {
-  apply {
-    update_checksum(
-      hdr.ipv4.isValid(),
-      {
-        hdr.ipv4.version,
-        hdr.ipv4.ihl,
-        hdr.ipv4.diffserv,
-        hdr.ipv4.totalLen,
-        hdr.ipv4.identification,
-        hdr.ipv4.flags,
-        hdr.ipv4.fragOffset,
-        hdr.ipv4.ttl,
-        hdr.ipv4.protocol,
-        hdr.ipv4.srcAddr,
-        hdr.ipv4.dstAddr
-      },
-      hdr.ipv4.hdrChecksum,
-      HashAlgorithm.csum16);
-  }
 }
 
 
@@ -300,7 +258,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       key = {
         hdr.sensordata.sensor_id: exact;
       }
-      size = 16; // at most 16 sensors
+      size = maximum_number_of_rules;
       default_action = NoAction();
     }
 
@@ -336,5 +294,34 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
   apply { }
 }
 
+control MyComputeChecksum(inout headers hdr, inout metadata meta) {
+  apply {
+    update_checksum(
+      hdr.ipv4.isValid(),
+      {
+        hdr.ipv4.version,
+        hdr.ipv4.ihl,
+        hdr.ipv4.diffserv,
+        hdr.ipv4.totalLen,
+        hdr.ipv4.identification,
+        hdr.ipv4.flags,
+        hdr.ipv4.fragOffset,
+        hdr.ipv4.ttl,
+        hdr.ipv4.protocol,
+        hdr.ipv4.srcAddr,
+        hdr.ipv4.dstAddr
+      },
+      hdr.ipv4.hdrChecksum,
+      HashAlgorithm.csum16);
+  }
+}
+
+control MyDeparser(packet_out packet, in headers hdr) {
+  apply {
+    packet.emit(hdr.ethernet);
+    packet.emit(hdr.ipv4);
+    packet.emit(hdr.wittness);
+  }
+}
 
 V1Switch(MyParser(), MyVerifyChecksum(), MyIngress(), MyEgress(), MyComputeChecksum(), MyDeparser()) main;
