@@ -8,6 +8,16 @@ typedef bit<32> ip4Addr_t;
 typedef bit<8>  sensor_id_t;
 typedef bit<8>  sensor_value_t;
 
+enum bit<8> rule_match_kind {
+  no_rule_found      = 0,
+  evaluated_to_true  = 1,
+  evaluated_to_false = 2
+}
+
+struct metadata {
+  rule_match_kind match;
+}
+
 enum bit<16> ethernet_kind {
   ipv4   = 0x800,
   sensor = 0x842
@@ -39,20 +49,15 @@ header sensor_data {
   sensor_value_t sensor_value;
 }
 
+header rule_match_result {
+  rule_match_kind match;
+}
+
 struct headers {
   ethernet_t ethernet;
   ipv4_t ipv4;
   sensor_data sensordata;
-}
-
-enum bit<2> rule_match_kind {
-  no_rule_found      = 0,
-  evaluated_to_true  = 1,
-  evaluated_to_false = 2
-}
-
-struct metadata {
-  rule_match_kind match;
+  rule_match_result result;
 }
 
 
@@ -318,7 +323,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 }
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-  apply { }
+  apply {
+    hdr.result.match = meta.match;
+  }
 }
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
@@ -347,6 +354,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
   apply {
     packet.emit(hdr.ethernet);
     packet.emit(hdr.ipv4);
+    packet.emit(hdr.result);
   }
 }
 
