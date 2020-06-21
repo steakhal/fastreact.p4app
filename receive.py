@@ -11,11 +11,8 @@ def expand(x):
     yield x
 
 def handle_pkt(pkt):
-  if SensorData in pkt:
-    data_layers = [l for l in expand(pkt) if l.name=='SensorData']
-    print("")
-    for sw in data_layers:
-      print("something happening 4545454545")
+  print('called handle_pkt: ', end='')
+  print(pkt)
 
 def main():
   iface = conf.iface

@@ -11,3 +11,4 @@ class SensorData(Packet):
   ]
 
 bind_layers(Ether, SensorData, type=0x842)
+bind_layers(SensorData, IP)
