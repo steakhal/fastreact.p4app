@@ -9,9 +9,10 @@ typedef bit<8>  sensor_id_t;
 typedef bit<8>  sensor_value_t;
 
 enum bit<8> rule_match_kind {
-  no_rule_found      = 0,
-  evaluated_to_true  = 1,
-  evaluated_to_false = 2
+  no_match_initiated = 0,
+  no_rule_found      = 1,
+  evaluated_to_true  = 2,
+  evaluated_to_false = 3
 }
 
 struct metadata {
@@ -297,6 +298,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
+    meta.match = rule_match_kind.no_match_initiated;
     if (hdr.sensordata.isValid())
       sensor_to_rule_mapping.apply();
     if (hdr.ipv4.isValid())
@@ -306,7 +308,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   apply {
-    hdr.result.match = meta.match;
+    if (meta.match != rule_match_kind.no_match_initiated)
+      hdr.result.match = meta.match;
   }
 }
 
