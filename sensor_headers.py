@@ -3,7 +3,6 @@
 
 from scapy.all import *
 
-
 class SensorData(Packet):
   fields_desc = [
     ByteField("sensor_id", 0),
