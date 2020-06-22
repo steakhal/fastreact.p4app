@@ -8,6 +8,7 @@ from sensor_headers import SensorData
 
 def main():
   iface = conf.iface
+  # TODO: currently it sends an example sensor data packet to the 'h2' node
   sensor_pkt = Ether(dst='00:04:00:00:00:01', src=get_if_hwaddr(iface)) / \
                SensorData(sensor_id=4, sensor_value=6) / \
                IP(dst='10.0.1.10')

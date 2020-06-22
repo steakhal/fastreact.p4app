@@ -5,23 +5,27 @@
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+
+// Change these values according to the value reprentations of the problem domain.
 typedef bit<8>  sensor_id_t;
 typedef bit<8>  sensor_value_t;
 
+// Simple state machine representing the result of matching rules.
 enum bit<8> rule_match_kind {
-  no_match_initiated = 0,
-  no_rule_found      = 1,
-  evaluated_to_true  = 2,
-  evaluated_to_false = 3
+  no_match_initiated = 0, // no rule lookup happened
+  no_rule_found      = 1, // lookup happened but no rule defined for the given sensor id
+  evaluated_to_true  = 2, // lookup happened and the corresponding rule evaluated to true
+  evaluated_to_false = 3  // same as above but evaluated to false
 }
 
+// It carries information from MyIngress to MyEgress
 struct metadata {
   rule_match_kind match;
 }
 
 enum bit<16> ethernet_kind {
   ipv4   = 0x800,
-  sensor = 0x842
+  sensor = 0x842 // dummy ethernet type representing the sensor packets
 }
 
 header ethernet_t {
@@ -45,11 +49,15 @@ header ipv4_t {
   ip4Addr_t dstAddr;
 }
 
+// Represents a sensor measurement.
 header sensor_data {
-  sensor_id_t sensor_id;
+  sensor_id_t sensor_id; // the identifier of the producer sensor (it is used by the id## fields of a rule)
   sensor_value_t sensor_value;
 }
 
+// Dummy header, which serves debugging purposes.
+// It is appended to the end of the outgoing packet, showing the state of
+// the rule matching logic resulted by the implementation.
 header rule_match_result {
   rule_match_kind match;
 }
@@ -81,6 +89,8 @@ const bit<32> number_of_ands = 4;
 // ((id00 op00 constant00)^(id01 op01 constant01)^(id02 op02 constant02)^(id03 op03 constant03))v
 // ((id10 op10 constant10)^(id11 op11 constant11)^(id12 op12 constant12)^(id13 op13 constant13))v
 // ((id20 op20 constant20)^(id21 op21 constant21)^(id22 op22 constant22)^(id23 op23 constant23))
+// each left operand is a variable identifier which is resolved to the last sensor value corresponding to that sensor id
+// each right operand is a simple numeric constant
 
 // A rule is a DNF expression.
 // That contains a sequence of disjuncts (at most number_of_ors one of them).
@@ -90,6 +100,7 @@ const bit<32> number_of_ands = 4;
 // If the first triplet of a disjunct is invalid, then that disjunct and the rest of the disjuncts are invalid.
 // You can assume that each rule must have at least one valid triplet.
 struct rule_t {
+  // note: unfortunately nested structs are not yet implemented by the p4 compiler, so unrolled this by hand
   sensor_id_t    id00;
   op_t           op00;
   sensor_value_t constant00;
@@ -171,6 +182,7 @@ bool isOpValid(in op_t op) {
   return op != op_t.invalid;
 }
 
+// precondition: call only on valid triplets (op != op_t.invalid)
 bool eval_triplet(in sensor_value_t val, in op_t op, in sensor_value_t constant) {
   // assuming valid op
   if (op == op_t.lt)
@@ -189,6 +201,8 @@ bool eval_triplet(in sensor_value_t val, in op_t op, in sensor_value_t constant)
 
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
+  // Stores the very last sensor value of a given sensor id.
+  // note: by default/initially each sensor id maps to zero value
   register<sensor_value_t>(maximum_number_of_sensors) sensor_history;
 
   action drop() {
@@ -199,6 +213,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.match = rule_match_kind.no_rule_found;
   }
 
+  // sets 'meta.match' to either 'evaluated_to_true' or 'evaluated_to_false'
   action apply_rule(
     sensor_id_t id00, op_t op00, sensor_value_t constant00,
     sensor_id_t id01, op_t op01, sensor_value_t constant01,
@@ -229,8 +244,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     sensor_value_t value22;
     sensor_value_t value23;
 
-    // unfortunately we can not read registers after a branch happen,
-    // so we can not omit unnecessary register reads
+    // unfortunately we can not read registers after a branch happened,
+    // so we have to read ahead every values since that would be probably needed
     sensor_history.read(value00, (bit<32>)id00);
     sensor_history.read(value01, (bit<32>)id01);
     sensor_history.read(value02, (bit<32>)id02);
@@ -245,7 +260,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     sensor_history.read(value23, (bit<32>)id23);
 
     // when a triplet is invalid, simply ignore that
-    // since the true is the identity value for the 'and' operation
+    // since the true is the identity value for the '&&' operation
     // note that the order of triplets is irrelevalnt
     // note that if no triplet is valid, then the rule is evaluated to true for every input
 
@@ -262,14 +277,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
                   (!isOpValid(op22) || eval_triplet(value22, op22, constant22)) &&
                   (!isOpValid(op23) || eval_triplet(value23, op23, constant23));
 
-    if (group0 || group1 || group2) {
-      // TODO: hook rule did match event?
-      meta.match = rule_match_kind.evaluated_to_true;
-      return;
-    }
-
-    // TODO: hook rule did not match event?
-    meta.match = rule_match_kind.evaluated_to_false;
+    meta.match = (group0 || group1 || group2) ? rule_match_kind.evaluated_to_true
+                                              : rule_match_kind.evaluated_to_false;
   }
 
   table sensor_to_rule_mapping {
@@ -346,6 +355,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 
 control MyDeparser(packet_out packet, in headers hdr) {
   apply {
+    // note: we no longer emit the sensordata, only the match result
     packet.emit(hdr.ethernet);
     packet.emit(hdr.ipv4);
     packet.emit(hdr.result);

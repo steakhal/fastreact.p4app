@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from scapy.all import *
-from sensor_headers import SensorData
 
 def expand(x):
   yield x
@@ -13,6 +12,8 @@ def expand(x):
 def handle_pkt(pkt):
   print('called handle_pkt: ', end='')
   print(pkt)
+  # TODO: pretty print the received packet
+  # note that the very last byte is the 'result'
 
 def main():
   iface = conf.iface
