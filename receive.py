@@ -3,6 +3,7 @@
 
 from scapy.all import *
 
+
 def expand(x):
   yield x
   while x.payload:

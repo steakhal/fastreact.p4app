@@ -49,7 +49,7 @@ these (3x4x3) integers represents the expression of `id4 <= 7`.
 
 Each non-sensor data packet forwarded to the requested destination as default.
 
-If the packet carries a sensor value the switch will try to look up a rule defined for the received packet's sensor ID.
+If the packet carries a sensor value, the switch will try to look up a rule defined for the received packet's sensor ID.
 If there is no rule bound to that sensor ID then the corresponding `result` byte will be created.
 Otherwise, the corresponding rule will be evaluated.
 During the evaluation of a rule, each `id` variable is resolved to the last cached value of the referenced sensor. (Note that at the beginning all sensor ID maps to zero since there was no previous measurement received by the switch)
