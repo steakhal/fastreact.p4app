@@ -6,7 +6,7 @@ This implementation is only proof of concept, for the practical application it n
 
 ## Setup
 
-- only tested this on Windows 10 Pro.
+- only tested on Windows 10 Pro.
 
 ### Prerequisites
  - Windows 10
