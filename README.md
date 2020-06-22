@@ -2,10 +2,11 @@
 
 DISCLAIMER: only a partial implementation of the paper called "[FastReact: In-Network Control and Caching for Industrial Control Networks using ProgrammableData Planes](https://arxiv.org/pdf/1808.06799.pdf)".
 We took a different approach, using match-action tables instead of registers.
-This implementation certainly needs some polishment.
+This implementation is only proof of concept, for the practical application it needs to be further developed (see Notes)
+
 ## Setup
 
-I've only tested this on Windows 10 Pro.
+- only tested this on Windows 10 Pro.
 
 ### Prerequisites
  - Windows 10
@@ -58,6 +59,5 @@ The egress pipeline stage serves a single purpose, to populate the response head
 
 ### Notes
 
-This is a proof of concept implementation.
 The switch could perform different actions eg. sending the sensor data packet to the control plane etc.
-In this implementation, the sensor packet is forwarded without the sensor data but with the `result` byte.
+The sensor packet is forwarded without the sensor data but with the `result` byte.
