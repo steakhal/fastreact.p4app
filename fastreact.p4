@@ -167,10 +167,12 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
   apply { }
 }
 
+bool isOpValid(in op_t op) {
+  return op != op_t.invalid;
+}
 
 bool eval_triplet(in sensor_value_t val, in op_t op, in sensor_value_t constant) {
-  if (op == op_t.invalid)
-    return false;
+  // assuming valid op
   if (op == op_t.lt)
     return val < constant;
   if (op == op_t.le)
@@ -242,26 +244,32 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     sensor_history.read(value22, (bit<32>)id22);
     sensor_history.read(value23, (bit<32>)id23);
 
-    // if the rule does not apply, return
-    if ((!eval_triplet(value00, op00, constant00) ||
-         !eval_triplet(value01, op01, constant01) ||
-         !eval_triplet(value02, op02, constant02) ||
-         !eval_triplet(value03, op03, constant03)) &&
-        (!eval_triplet(value10, op10, constant10) ||
-         !eval_triplet(value11, op11, constant11) ||
-         !eval_triplet(value12, op12, constant12) ||
-         !eval_triplet(value13, op13, constant13)) &&
-        (!eval_triplet(value20, op20, constant20) ||
-         !eval_triplet(value21, op21, constant21) ||
-         !eval_triplet(value22, op22, constant22) ||
-         !eval_triplet(value23, op23, constant23))) {
-      // TODO: hook rule did not match event?
-      meta.match = rule_match_kind.evaluated_to_false;
+    // when a triplet is invalid, simply ignore that
+    // since the true is the identity value for the 'and' operation
+    // note that the order of triplets is irrelevalnt
+    // note that if no triplet is valid, then the rule is evaluated to true for every input
+
+    bool group0 = (!isOpValid(op00) || eval_triplet(value00, op00, constant00)) &&
+                  (!isOpValid(op01) || eval_triplet(value01, op01, constant01)) &&
+                  (!isOpValid(op02) || eval_triplet(value02, op02, constant02)) &&
+                  (!isOpValid(op03) || eval_triplet(value03, op03, constant03));
+    bool group1 = (!isOpValid(op10) || eval_triplet(value10, op10, constant10)) &&
+                  (!isOpValid(op11) || eval_triplet(value11, op11, constant11)) &&
+                  (!isOpValid(op12) || eval_triplet(value12, op12, constant12)) &&
+                  (!isOpValid(op13) || eval_triplet(value13, op13, constant13));
+    bool group2 = (!isOpValid(op20) || eval_triplet(value20, op20, constant20)) &&
+                  (!isOpValid(op21) || eval_triplet(value21, op21, constant21)) &&
+                  (!isOpValid(op22) || eval_triplet(value22, op22, constant22)) &&
+                  (!isOpValid(op23) || eval_triplet(value23, op23, constant23));
+
+    if (group0 || group1 || group2) {
+      // TODO: hook rule did match event?
+      meta.match = rule_match_kind.evaluated_to_true;
       return;
     }
 
-    // TODO: hook rule did match event?
-    meta.match = rule_match_kind.evaluated_to_true;
+    // TODO: hook rule did not match event?
+    meta.match = rule_match_kind.evaluated_to_false;
   }
 
   table sensor_to_rule_mapping {
@@ -307,8 +315,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   apply {
-    if (meta.match != rule_match_kind.no_match_initiated)
+    if (meta.match != rule_match_kind.no_match_initiated) {
+      hdr.result.setValid();
       hdr.result.match = meta.match;
+    }
   }
 }
 
