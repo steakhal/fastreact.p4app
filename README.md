@@ -2,11 +2,11 @@
 
 DISCLAIMER: only a partial implementation of the paper called "[FastReact: In-Network Control and Caching for Industrial Control Networks using ProgrammableData Planes](https://arxiv.org/pdf/1808.06799.pdf)".
 We took a different approach, using match-action tables instead of registers.
-This implementation is only proof of concept, for the practical application it needs to be further developed (see Notes)
+This implementation is only proof of concept, for the practical application it needs to be further developed (see Notes).
 
 ## Setup
 
-- only tested on Windows 10 Pro.
+- only tested on Windows 10 Pro
 
 ### Prerequisites
  - Windows 10
@@ -27,27 +27,27 @@ This implementation is only proof of concept, for the practical application it n
 
 ## Implementation logic
 
-The user can define rules in conjunctive normal form:
+The user can define rules in disjunctive normal form:
 ```
 ((id00 op00 constant00)^(id01 op01 constant01)^(id02 op02 constant02)^(id03 op03 constant03))v
 ((id10 op10 constant10)^(id11 op11 constant11)^(id12 op12 constant12)^(id13 op13 constant13))v
 ((id20 op20 constant20)^(id21 op21 constant21)^(id22 op22 constant22)^(id23 op23 constant23))
 ```
-where each triplet is consist of:
+where each triplet consists of:
 - a sensor identifier (`id`)
 - a logical operation (`op`)
 - and a constant value (`constant`)
 
-Any triplet represent a literal, where we compare the sensor value to a constant (eg. S1 > 5, where S1 is the measured value by sensor 1)"
-Any rows (consist of 4 triplets) represent a condition, any of the triplets evaluating true satisfies the condtion (eg. S1 > 5 ∨ S2 = 8)
-The whole (3x4x3) integer values represent the rule, all of the conditions (represented by rows) needs to be fulfilled to satisfy the rule.
-(triplet starting with 0 is invalid, represents empty literal and evaluates true always)
+The whole rule is composed of 3 rows, every row representing a condition. If any condition is satisfied, the rule is satisfied.
+A row consists of 4 literal and represents a condition, the condition is satisfied, if each of the 4 literals is satisfied.
+A triplet represents a literal, where we compare the sensor value to a constant (eg. S1 > 5, where S1 is the last measured value by sensor 1)"
+(triplets of `0 0 0` (or any `\d 0 \d`) are invalid, and are always satisfied; conditions containing only invalid triplets are invalid, and are never satisfied)
 Take the example of `fastreact.config`, which is used for testing: `4 2 7 0 0 0 0 0 0 0 0 0   0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0`
 these (3x4x3) integers represents the expression of `id4 <= 7`.
 
 ### Packet flow
 
-Each non-sensor data packet forwarded to the requested destination as default.
+Each non-sensor data packet forwarded to the requested destination by default.
 
 If the packet carries a sensor value, the switch will try to look up a rule defined for the received packet's sensor ID.
 If there is no rule bound to that sensor ID then the corresponding `result` byte will be created.
