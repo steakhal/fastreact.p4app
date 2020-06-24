@@ -6,6 +6,7 @@ import time
 from scapy.all import *
 from sensor_headers import SensorData
 
+
 def main():
   iface = conf.iface
   # TODO: currently it sends an example sensor data packet to the 'h2' node
